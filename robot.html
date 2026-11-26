@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<title>SmartBin Controller</title>
+<style>
+  :root {
+    --bg: #0b1220;
+    --panel: #131c2e;
+    --panel-2: #1b2740;
+    --line: #24324f;
+    --text: #e6edf7;
+    --muted: #8a9bb8;
+    --green: #22c55e;
+    --green-glow: rgba(34, 197, 94, 0.65);
+    --blue: #38bdf8;
+    --red: #ef4444;
+    --radius: 18px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+
+  body {
+    background: radial-gradient(1200px 600px at 50% -20%, #1a2a4a 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    -webkit-user-select: none;
+    user-select: none;
+    overscroll-behavior: none;
+  }
+
+  .app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+  }
+
+  /* ---------- Header ---------- */
+  header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .brand h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.3px; }
+  .brand p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .power {
+    width: 56px; height: 56px; border-radius: 50%;
+    border: 1px solid var(--line);
+    background: linear-gradient(180deg, #22314f, #18243d);
+    color: var(--muted); font-size: 24px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 5px 0 #0d1526, 0 10px 18px rgba(0,0,0,0.35);
+    transition: box-shadow 0.2s, color 0.2s, background 0.2s, transform 0.08s;
+    flex-shrink: 0;
+  }
+  .power:active { transform: translateY(3px); box-shadow: 0 2px 0 #0d1526; }
+  .power.on {
+    color: #eafff1;
+    background: linear-gradient(180deg, #22c55e, #15803d);
+    border-color: #4ade80;
+    box-shadow: 0 0 0 2px var(--green), 0 0 22px var(--green-glow), 0 5px 0 #0f5f2c;
+  }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; border-radius: 999px;
+    background: var(--panel-2); border: 1px solid var(--line);
+    font-size: 12px; font-weight: 600; white-space: nowrap;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .pill.ok .dot   { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .pill.busy .dot { background: var(--blue); }
+  .pill.err .dot  { background: var(--red); }
+
+  /* ---------- Cards ---------- */
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 14px;
+  }
+  .card h2 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--muted); margin-bottom: 10px; font-weight: 600;
+  }
+  .row { display: flex; gap: 8px; align-items: center; }
+
+  /* ---------- Inputs ---------- */
+  input[type="text"] {
+    flex: 1; min-width: 0;
+    background: var(--panel-2); border: 1px solid var(--line);
+    color: var(--text); border-radius: 12px; padding: 12px;
+    font-size: 16px; outline: none;
+    -webkit-user-select: text; user-select: text;
+  }
+  input[type="text"]:focus { border-color: var(--blue); }
+
+  .select-wrap { position: relative; }
+  .select-wrap::after {
+    content: "▾"; position: absolute; right: 14px; top: 50%;
+    transform: translateY(-50%); color: var(--muted); pointer-events: none; font-size: 14px;
+  }
+  select {
+    width: 100%; appearance: none; -webkit-appearance: none;
+    background: var(--panel-2); border: 1px solid var(--line);
+    color: var(--text); border-radius: 12px; padding: 12px 36px 12px 14px;
+    font-size: 15px; font-weight: 600; outline: none; cursor: pointer;
+  }
+  select:focus { border-color: var(--green); }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    background: linear-gradient(180deg, #22314f, #18243d);
+    border: 1px solid var(--line);
+    color: var(--text); border-radius: 12px; padding: 0 14px; min-height: 46px;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    box-shadow: 0 4px 0 #0d1526;
+    transition: box-shadow 0.25s, border-color 0.25s, color 0.25s, transform 0.08s;
+  }
+  .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #0d1526; }
+
+  /* Green glow: applied on click (flash) and latched when active */
+  .glow, .on-glow {
+    border-color: var(--green) !important;
+    color: #eafff1 !important;
+    box-shadow: 0 0 0 1px var(--green), 0 0 18px var(--green-glow) !important;
+  }
+
+  .controls { transition: opacity 0.25s; }
+  body.off .controls { opacity: 0.4; pointer-events: none; }
+
+  /* ---------- Stats ---------- */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .stat { background: var(--panel-2); border-radius: 14px; padding: 10px 4px; text-align: center; }
+  .stat small { display: block; font-size: 10px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat strong { font-size: 14px; }
+
+  /* ---------- Button pad ---------- */
+  .pad-wrap { display: flex; justify-content: center; }
+  .pad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 12px; width: 100%; max-width: 340px; aspect-ratio: 1;
+  }
+  .key {
+    border: 1px solid var(--line); border-radius: 22px;
+    background: linear-gradient(180deg, #22314f, #18243d);
+    color: var(--text); font-size: 28px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    touch-action: none;
+    box-shadow: 0 6px 0 #0d1526, 0 10px 20px rgba(0,0,0,0.35);
+    transition: box-shadow 0.25s, border-color 0.25s, color 0.25s, transform 0.08s, background 0.08s;
+  }
+  .key:active, .key.active { transform: translateY(4px); box-shadow: 0 2px 0 #0d1526; }
+  .key.up    { grid-column: 2; grid-row: 1; }
+  .key.left  { grid-column: 1; grid-row: 2; }
+  .key.right { grid-column: 3; grid-row: 2; }
+  .key.down  { grid-column: 2; grid-row: 3; }
+  .key.stop  {
+    grid-column: 2; grid-row: 2; font-size: 13px; font-weight: 800;
+    letter-spacing: 1px; color: #fca5a5;
+    background: linear-gradient(180deg, #3a2430, #2a1820);
+  }
+  .key.glow { border-radius: 22px; }
+
+  /* ---------- Analog panel ---------- */
+  .analog { display: none; grid-template-columns: 1fr 1fr; gap: 14px; align-items: center; }
+  .analog.show { display: grid; }
+  .buttons-panel { display: none; }
+  .buttons-panel.show { display: block; }
+
+  .joy-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .joy {
+    position: relative; width: 170px; height: 170px; border-radius: 50%;
+    background: radial-gradient(circle at 50% 45%, #1d2b47, #0f1828);
+    border: 1px solid var(--line);
+    box-shadow: inset 0 4px 14px rgba(0,0,0,0.45), 0 6px 18px rgba(0,0,0,0.35);
+    touch-action: none;
+  }
+  .joy::before, .joy::after {
+    content: ""; position: absolute; background: var(--line);
+  }
+  .joy::before { left: 50%; top: 12px; bottom: 12px; width: 1px; }
+  .joy::after  { top: 50%; left: 12px; right: 12px; height: 1px; }
+  .knob {
+    position: absolute; width: 60px; height: 60px; border-radius: 50%;
+    left: calc(50% - 30px); top: calc(50% - 30px);
+    background: linear-gradient(180deg, #2c3f63, #1a2740);
+    border: 1px solid #3a5079;
+    box-shadow: 0 5px 10px rgba(0,0,0,0.45);
+    transition: transform 0.12s ease-out, box-shadow 0.25s, border-color 0.25s;
+    pointer-events: none;
+  }
+  .joy.glow .knob { border-color: var(--green); box-shadow: 0 0 16px var(--green-glow); }
+  .joy-read { font-size: 12px; color: var(--muted); font-family: ui-monospace, Menlo, Consolas, monospace; text-align: center; }
+  .joy-read b { color: var(--text); }
+
+  .throttle { display: flex; flex-direction: column; gap: 10px; }
+  .speed-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+  .speed-label strong { color: var(--text); font-size: 14px; }
+  .bar {
+    height: 12px; border-radius: 999px; background: var(--panel-2);
+    border: 1px solid var(--line); overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #15803d, #22c55e);
+    box-shadow: 0 0 12px var(--green-glow);
+    transition: width 0.1s linear;
+  }
+  .throttle .btn { width: 100%; min-height: 58px; font-size: 15px; }
+  .btn.brake { color: #fca5a5; }
+
+  .hint { font-size: 12px; color: var(--muted); text-align: center; margin-top: 10px; line-height: 1.5; }
+  .hint.left { text-align: left; }
+
+  /* ---------- Emergency stop ---------- */
+  .estop {
+    width: 100%; min-height: 62px; border: none; border-radius: 18px;
+    background: linear-gradient(180deg, #ef4444, #b91c1c);
+    color: #fff; font-size: 17px; font-weight: 800; letter-spacing: 1.5px;
+    box-shadow: 0 6px 0 #7f1d1d; cursor: pointer;
+  }
+  .estop:active { transform: translateY(4px); box-shadow: 0 2px 0 #7f1d1d; }
+
+  /* ---------- Log ---------- */
+  .log {
+    list-style: none; max-height: 150px; overflow-y: auto;
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
+  }
+  .log li { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); color: var(--muted); }
+  .log li b { color: var(--text); }
+  .log li em { margin-left: auto; font-style: normal; }
+  .log em.ok { color: var(--green); }
+  .log em.fail { color: var(--red); }
+</style>
+</head>
+<body class="off">
+<div class="app">
+
+  <header>
+    <div class="brand">
+      <h1>SmartBin Controller</h1>
+      <p>ESP-01 Wi-Fi · 2-motor drive</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div id="pill" class="pill"><span class="dot"></span><span id="pillText">Powered off</span></div>
+      <button id="power" class="power" type="button" aria-label="Power" aria-pressed="false">⏻</button>
+    </div>
+  </header>
+
+  <section class="card">
+    <h2>Connection</h2>
+    <div class="row">
+      <input id="ip" type="text" value="http://192.168.4.1" inputmode="url" autocomplete="off" spellcheck="false" aria-label="Bin address">
+      <button id="ping" class="btn" type="button">Ping</button>
+    </div>
+    <p class="hint left">Connect to the <b>SmartBin</b> Wi-Fi, then press the power button.</p>
+  </section>
+
+  <section class="card">
+    <h2>Control Mode</h2>
+    <div class="select-wrap">
+      <select id="mode" aria-label="Control mode">
+        <option value="button">Button control</option>
+        <option value="analog">Analog control</option>
+      </select>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Status</h2>
+    <div class="stats">
+      <div class="stat"><small>Motors</small><strong id="motor">STOP</strong></div>
+      <div class="stat"><small>Speed</small><strong id="speedStat">0%</strong></div>
+      <div class="stat"><small>Sent</small><strong id="sent">0</strong></div>
+      <div class="stat"><small>Errors</small><strong id="errors">0</strong></div>
+    </div>
+  </section>
+
+  <section class="card controls">
+    <h2 id="panelTitle">Drive</h2>
+
+    <div id="buttonsPanel" class="buttons-panel show">
+      <div class="pad-wrap">
+        <div class="pad">
+          <button class="key up"    data-cmd="F" type="button" aria-label="Forward">▲</button>
+          <button class="key left"  data-cmd="L" type="button" aria-label="Turn left">◀</button>
+          <button id="stopKey" class="key stop" type="button" aria-label="Stop">STOP</button>
+          <button class="key right" data-cmd="R" type="button" aria-label="Turn right">▶</button>
+          <button class="key down"  data-cmd="B" type="button" aria-label="Backward">▼</button>
+        </div>
+      </div>
+      <p class="hint">Hold a button to drive. Release to stop.</p>
+    </div>
+
+    <div id="analogPanel" class="analog">
+      <div class="joy-wrap">
+        <div id="joy" class="joy" role="application" aria-label="Analog steering joystick">
+          <div id="knob" class="knob"></div>
+        </div>
+        <div class="joy-read">Dir: <b id="joyDir">CENTER</b></div>
+      </div>
+
+      <div class="throttle">
+        <div class="speed-label">Throttle <strong id="speedText">0%</strong></div>
+        <div class="bar"><div id="speedBar" class="bar-fill"></div></div>
+        <button id="accel" class="btn" type="button">ACCELERATE</button>
+        <button id="brake" class="btn brake" type="button">BRAKE</button>
+      </div>
+    </div>
+
+    <p class="hint" id="modeHint">Hold a direction button to drive. Release to stop.</p>
+  </section>
+
+  <button id="estop" class="estop" type="button">EMERGENCY STOP</button>
+
+  <section class="card">
+    <h2>Activity</h2>
+    <ul id="log" class="log"></ul>
+  </section>
+
+</div>
+
+<script>
+  const CMD_NAME = { F: "Forward", B: "Backward", L: "Turn left", R: "Turn right", S: "Stop" };
+  const MOTOR_NAME = { F: "FWD", B: "BACK", L: "LEFT", R: "RGHT", S: "STOP" };
+  const KEYMAP = {
+    ArrowUp: "F", w: "F", W: "F",
+    ArrowDown: "B", s: "B", S: "B",
+    ArrowLeft: "L", a: "L", A: "L",
+    ArrowRight: "R", d: "R", D: "R"
+  };
+
+  const TICK_MS = 100;        // engine tick
+  const PERIOD_MS = 400;      // pulse period used for throttle
+  const KEEPALIVE_MS = 250;   // resend drive command while moving (firmware timeout is 800 ms)
+  const ACCEL_STEP = 5;       // throttle change per step
+  const ACCEL_MS = 120;       // time between steps while accelerating
+  const JOY_DEADZONE = 0.3;   // joystick threshold before a direction is sent
+
+  const $ = (s) => document.querySelector(s);
+  const el = {
+    power: $("#power"), pill: $("#pill"), pillText: $("#pillText"),
+    ip: $("#ip"), ping: $("#ping"), mode: $("#mode"),
+    buttonsPanel: $("#buttonsPanel"), analogPanel: $("#analogPanel"),
+    panelTitle: $("#panelTitle"), modeHint: $("#modeHint"),
+    stopKey: $("#stopKey"), estop: $("#estop"),
+    motor: $("#motor"), speedStat: $("#speedStat"), sent: $("#sent"), errors: $("#errors"),
+    joy: $("#joy"), knob: $("#knob"), joyDir: $("#joyDir"),
+    speedText: $("#speedText"), speedBar: $("#speedBar"),
+    accel: $("#accel"), brake: $("#brake"), log: $("#log")
+  };
+
+  const state = {
+    power: false,
+    mode: "button",
+    dir: null,          // current drive direction: F, B, L, R or null
+    speed: 0,           // analog throttle 0-100
+    lastSent: "S",
+    lastSentAt: 0,
+    sent: 0,
+    errors: 0
+  };
+
+  let phase = 0;
+  let accelTimer = null;
+
+  // ---------- Helpers ----------
+  function baseUrl() {
+    let v = el.ip.value.trim();
+    if (!/^https?:\/\//i.test(v)) v = "http://" + v;
+    return v.replace(/\/+$/, "");
+  }
+
+  function setStatus(kind, text) {
+    el.pill.className = "pill " + kind;
+    el.pillText.textContent = text;
+  }
+
+  function glow(elm) { elm.classList.add("glow"); }
+  function unglow(elm, delay = 350) { setTimeout(() => elm.classList.remove("glow"), delay); }
+
+  function log(cmd, result) {
+    const li = document.createElement("li");
+    const time = document.createElement("span");
+    time.textContent = new Date().toLocaleTimeString();
+    const name = document.createElement("b");
+    name.textContent = cmd + " " + (CMD_NAME[cmd] || "");
+    const res = document.createElement("em");
+    res.className = result === "ok" ? "ok" : "fail";
+    res.textContent = result;
+    li.append(time, name, res);
+    el.log.prepend(li);
+    while (el.log.children.length > 30) el.log.lastChild.remove();
+  }
+
+  function currentSpeed() {
+    return state.mode === "button" ? (state.dir ? 100 : 0) : state.speed;
+  }
+
+  function render() {
+    const sp = currentSpeed();
+    el.speedBar.style.width = sp + "%";
+    el.speedText.textContent = sp + "%";
+    el.speedStat.textContent = sp + "%";
+    el.motor.textContent = state.power && state.dir && sp > 0 ? MOTOR_NAME[state.dir] : "STOP";
+    el.sent.textContent = state.sent;
+    el.errors.textContent = state.errors;
+  }
+
+  // ---------- Network ----------
+  function sendCmd(cmd, announce = false) {
+    state.lastSent = cmd;
+    state.lastSentAt = Date.now();
+    fetch(`${baseUrl()}/${cmd}`, { mode: "no-cors", cache: "no-store" })
+      .then(() => {
+        state.sent++;
+        if (state.power) setStatus("ok", "Connected");
+        if (announce) log(cmd, "ok");
+      })
+      .catch(() => {
+        state.errors++;
+        if (state.power) setStatus("err", "No response");
+        log(cmd, "fail");
+      })
+      .finally(render);
+  }
+
+  // ---------- Drive engine ----------
+  // Runs every 100 ms. Sends a command only when the desired state changes,
+  // plus a keepalive while moving. Throttle below 100% is applied as a
+  // duty-cycle pulse, since the firmware has only one motor speed.
+  function engineTick() {
+    if (!state.power) return;
+
+    phase = (phase + TICK_MS) % PERIOD_MS;
+    const speed = currentSpeed();
+
+    let want = "S";
+    if (state.dir && speed > 0) {
+      const onMs = (speed / 100) * PERIOD_MS;
+      want = (speed >= 100 || phase < onMs) ? state.dir : "S";
+    }
+
+    const now = Date.now();
+    if (want !== state.lastSent) {
+      sendCmd(want);
+    } else if (want !== "S" && now - state.lastSentAt >= KEEPALIVE_MS) {
+      sendCmd(want);
+    }
+    render();
+  }
+  setInterval(engineTick, TICK_MS);
+
+  function stopAll(announce = true) {
+    state.dir = null;
+    state.speed = 0;
+    stopAccel();
+    resetJoystick();
+    releaseKeys();
+    sendCmd("S", announce);
+    render();
+  }
+
+  // ---------- Power ----------
+  function setPower(on) {
+    state.power = on;
+    document.body.classList.toggle("off", !on);
+    el.power.classList.toggle("on", on);
+    el.power.setAttribute("aria-pressed", String(on));
+
+    if (on) {
+      setStatus("busy", "Connecting…");
+      sendCmd("S", true);            // connection check
+    } else {
+      stopAll(true);
+      setStatus("", "Powered off");
+    }
+    render();
+  }
+
+  el.power.addEventListener("click", () => setPower(!state.power));
+
+  // ---------- Mode switch ----------
+  function applyMode() {
+    const analog = state.mode === "analog";
+    el.buttonsPanel.classList.toggle("show", !analog);
+    el.analogPanel.classList.toggle("show", analog);
+    el.panelTitle.textContent = analog ? "Analog Drive" : "Drive";
+    el.modeHint.textContent = analog
+      ? "Steer with the joystick. Use Accelerate and Brake for speed."
+      : "Hold a direction button to drive. Release to stop.";
+  }
+
+  el.mode.addEventListener("change", () => {
+    state.mode = el.mode.value;
+    state.dir = null;
+    state.speed = 0;
+    stopAccel();
+    resetJoystick();
+    applyMode();
+    if (state.power) sendCmd("S", true);
+    render();
+  });
+
+  // ---------- Button pad ----------
+  function pressDir(cmd, btn) {
+    if (!state.power) return;
+    glow(btn);
+    state.dir = cmd;
+    if (navigator.vibrate) navigator.vibrate(12);
+  }
+
+  function releaseDir(btn) {
+    state.dir = null;
+    unglow(btn);
+  }
+
+  document.querySelectorAll(".key[data-cmd]").forEach((btn) => {
+    const cmd = btn.dataset.cmd;
+    btn.addEventListener("contextmenu", (e) => e.preventDefault());
+    btn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      btn.setPointerCapture(e.pointerId);
+      pressDir(cmd, btn);
+    });
+    ["pointerup", "pointercancel", "lostpointercapture"].forEach((evt) =>
+      btn.addEventListener(evt, () => releaseDir(btn))
+    );
+  });
+
+  el.stopKey.addEventListener("click", () => {
+    if (!state.power) return;
+    glow(el.stopKey); unglow(el.stopKey);
+    stopAll(true);
+  });
+
+  // ---------- Analog joystick ----------
+  function joyReadout(nx, ny, dir) {
+    const names = { F: "FORWARD", B: "BACKWARD", L: "LEFT", R: "RIGHT" };
+    el.joyDir.textContent = dir ? names[dir] : "CENTER";
+  }
+
+  function joyMove(e) {
+    const r = el.joy.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const max = r.width / 2 - el.knob.offsetWidth / 2;
+
+    let dx = e.clientX - cx;
+    let dy = e.clientY - cy;
+    const d = Math.hypot(dx, dy);
+    if (d > max) { dx *= max / d; dy *= max / d; }
+    el.knob.style.transform = `translate(${dx}px, ${dy}px)`;
+
+    const nx = dx / max;
+    const ny = -dy / max;               // up is positive
+    const mag = Math.hypot(nx, ny);
+
+    let dir = null;
+    if (mag > JOY_DEADZONE) {
+      dir = Math.abs(nx) > Math.abs(ny) ? (nx > 0 ? "R" : "L") : (ny > 0 ? "F" : "B");
+    }
+    state.dir = state.power ? dir : null;
+    joyReadout(nx, ny, dir);
+  }
+
+  function resetJoystick() {
+    el.knob.style.transform = "translate(0px, 0px)";
+    el.joy.classList.remove("glow");
+    state.dir = null;
+    joyReadout(0, 0, null);
+  }
+
+  el.joy.addEventListener("pointerdown", (e) => {
+    if (!state.power) return;
+    e.preventDefault();
+    el.joy.setPointerCapture(e.pointerId);
+    el.joy.classList.add("glow");
+    joyMove(e);
+  });
+  el.joy.addEventListener("pointermove", (e) => {
+    if (el.joy.hasPointerCapture(e.pointerId)) joyMove(e);
+  });
+  ["pointerup", "pointercancel", "lostpointercapture"].forEach((evt) =>
+    el.joy.addEventListener(evt, resetJoystick)
+  );
+
+  // ---------- Throttle: accelerate and brake ----------
+  function startAccel(e) {
+    if (!state.power) return;
+    e.preventDefault();
+    el.accel.setPointerCapture(e.pointerId);
+    glow(el.accel);
+    stopAccel();
+    accelTimer = setInterval(() => {
+      state.speed = Math.min(100, state.speed + ACCEL_STEP);
+      render();
+    }, ACCEL_MS);
+  }
+
+  function stopAccel() {
+    clearInterval(accelTimer);
+    accelTimer = null;
+    el.accel.classList.remove("glow");
+  }
+
+  el.accel.addEventListener("pointerdown", startAccel);
+  ["pointerup", "pointercancel", "lostpointercapture"].forEach((evt) =>
+    el.accel.addEventListener(evt, () => {
+      stopAccel();
+      unglow(el.accel, 0);
+    })
+  );
+
+  el.brake.addEventListener("click", () => {
+    if (!state.power) return;
+    glow(el.brake); unglow(el.brake);
+    state.speed = 0;
+    stopAccel();
+    sendCmd("S", true);
+    render();
+  });
+
+  // ---------- Ping and emergency stop ----------
+  el.ping.addEventListener("click", () => {
+    if (!state.power) return;
+    glow(el.ping); unglow(el.ping);
+    sendCmd("S", true);
+  });
+
+  el.estop.addEventListener("click", () => {
+    glow(el.estop); unglow(el.estop);
+    if (navigator.vibrate) navigator.vibrate([30, 40, 30]);
+    if (state.power) stopAll(true);
+    else sendCmd("S", true);
+  });
+
+  // ---------- Keyboard (button mode, for desktop testing) ----------
+  function keyBtn(cmd) { return document.querySelector(`.key[data-cmd="${cmd}"]`); }
+
+  function releaseKeys() {
+    document.querySelectorAll(".key.glow").forEach((b) => unglow(b, 0));
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (!state.power) return;
+    if (e.key === " ") { e.preventDefault(); stopAll(true); return; }
+    if (state.mode !== "button") return;
+    const cmd = KEYMAP[e.key];
+    if (!cmd || e.repeat) return;
+    e.preventDefault();
+    pressDir(cmd, keyBtn(cmd));
+  });
+
+  document.addEventListener("keyup", (e) => {
+    if (state.mode !== "button") return;
+    const cmd = KEYMAP[e.key];
+    if (cmd) releaseDir(keyBtn(cmd));
+  });
+
+  // ---------- Safety: stop when the app is hidden or loses focus ----------
+  function safetyRelease() {
+    if (!state.power) return;
+    state.dir = null;
+    stopAccel();
+    resetJoystick();
+    releaseKeys();
+  }
+  window.addEventListener("blur", safetyRelease);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) safetyRelease();
+  });
+
+  // ---------- Init ----------
+  applyMode();
+  setStatus("", "Powered off");
+  render();
+  log("—", "ready");
+</script>
+</body>
+</html>
